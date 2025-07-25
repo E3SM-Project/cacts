@@ -185,21 +185,21 @@ class SharedArea(object):
         os.umask(self._orig_umask)
 
 ###############################################################################
-def expand_variables(tgt_obj, src_obj_dict):
+def evaluate_py_expressions(tgt_obj, src_obj_dict):
 ###############################################################################
 
     # Only user-defined types have the __dict__ attribute
     if hasattr(tgt_obj,'__dict__'):
         for name,val in vars(tgt_obj).items():
-            setattr(tgt_obj,name,expand_variables(val,src_obj_dict))
+            setattr(tgt_obj,name,evaluate_py_expressions(val,src_obj_dict))
 
     elif isinstance(tgt_obj,dict):
         for name,val in tgt_obj.items():
-            tgt_obj[name] = expand_variables(val,src_obj_dict)
+            tgt_obj[name] = evaluate_py_expressions(val,src_obj_dict)
 
     elif isinstance(tgt_obj,list):
         for i,val in enumerate(tgt_obj):
-            tgt_obj[i] = expand_variables(val,src_obj_dict)
+            tgt_obj[i] = evaluate_py_expressions(val,src_obj_dict)
 
     elif isinstance(tgt_obj,str):
 
@@ -262,21 +262,21 @@ def safe_expression(expression):
     return True  # Safe expression
 
 ###############################################################################
-def evaluate_commands(tgt_obj,env_setup=None):
+def evaluate_bash_commands(tgt_obj,env_setup=None):
 ###############################################################################
 
     # Only user-defined types have the __dict__ attribute
     if hasattr(tgt_obj,'__dict__'):
         for name,val in vars(tgt_obj).items():
-            setattr(tgt_obj,name,evaluate_commands(val,env_setup))
+            setattr(tgt_obj,name,evaluate_bash_commands(val,env_setup))
 
     elif isinstance(tgt_obj,dict):
         for name,val in tgt_obj.items():
-            tgt_obj[name] = evaluate_commands(val,env_setup)
+            tgt_obj[name] = evaluate_bash_commands(val,env_setup)
 
     elif isinstance(tgt_obj,list):
         for i,val in enumerate(tgt_obj):
-            tgt_obj[i] = evaluate_commands(val,env_setup)
+            tgt_obj[i] = evaluate_bash_commands(val,env_setup)
 
     elif isinstance(tgt_obj,str):
         pattern = r'\$\((.*?)\)'
