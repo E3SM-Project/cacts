@@ -185,46 +185,53 @@ class SharedArea(object):
         os.umask(self._orig_umask)
 
 ###############################################################################
-def expand_variables(tgt_obj, src_obj_dict):
+def evaluate_py_expressions(tgt_obj, src_obj_dict):
 ###############################################################################
 
     # Only user-defined types have the __dict__ attribute
     if hasattr(tgt_obj,'__dict__'):
         for name,val in vars(tgt_obj).items():
-            setattr(tgt_obj,name,expand_variables(val,src_obj_dict))
+            setattr(tgt_obj,name,evaluate_py_expressions(val,src_obj_dict))
 
     elif isinstance(tgt_obj,dict):
         for name,val in tgt_obj.items():
-            tgt_obj[name] = expand_variables(val,src_obj_dict)
+            tgt_obj[name] = evaluate_py_expressions(val,src_obj_dict)
 
     elif isinstance(tgt_obj,list):
         for i,val in enumerate(tgt_obj):
-            tgt_obj[i] = expand_variables(val,src_obj_dict)
+            tgt_obj[i] = evaluate_py_expressions(val,src_obj_dict)
 
     elif isinstance(tgt_obj,str):
-        pattern = r'\$\{(\w+)\.(\w+)(.*?)\}'
 
-        matches = re.findall(pattern,tgt_obj)
-        for obj_name, att_name, expression in matches:
+        # First, extract content of ${...} (if any)
+        beg = tgt_obj.find("${")
+        end = tgt_obj.rfind("}")
+
+        if beg==-1:
+            expect (end==-1, f"Badly formatted expression '{tgt_obj}'.")
+            return tgt_obj
+
+        expect (end>beg, f"Badly formatted expression '{tgt_obj}'.")
+
+        expression = tgt_obj[beg+2:end]
+
+        pattern = r'\b(\w+)\.(\w+)\b'
+        matches = re.findall(pattern,expression)
+        for obj_name, att_name in matches:
             expect (obj_name in src_obj_dict.keys(),
-                    f"Invalid configuration ${{{obj_name}.{att_name}}}. Must be ${{obj.attr}}, with obj in {src_obj_dict.keys()}")
-            obj = src_obj_dict[obj_name]
-            expect (hasattr(obj,att_name),
-                    f"{obj_name} has no attribute '{att_name}'\n"
-                    f"  - existing attributes: {dir(obj)}\n")
+                    f"Invalid expression '{obj_name}.{att_name}': '{obj_name}' must be in {src_obj_dict.keys()}")
 
-            eval_str = f"obj.{att_name}{expression}"
-            expect (safe_expression(expression),
-                    f"Cannot evaluate expression '{obj_name}.{att_name}{expression}'. A dangerous pattern was detected in the expression")
-            try:
-                result = eval(eval_str)
-                tgt_obj = tgt_obj.replace(f"${{{obj_name}.{att_name}{expression}}}",str(result))
-            except AttributeError:
-                print (f"Could not evaluate expression {tgt_obj}.\n")
-                raise
+            expression = expression.replace(f'{obj_name}.{att_name}',f"src_obj_dict['{obj_name}'].{att_name}")
 
-        expect (not re.findall(pattern,tgt_obj),
-                f"Something went wrong while replacing ${{..}} patterns in string '{tgt_obj}'\n")
+        expect (safe_expression(expression),
+                f"Cannot evaluate expression '{tgt_obj}'. A dangerous pattern was detected in the expression")
+
+        try:
+            result = eval(expression)
+            tgt_obj = tgt_obj[:beg] + str(result) + tgt_obj[end+1:]
+        except AttributeError:
+            print (f"Could not evaluate expression {tgt_obj}.\n")
+            raise
 
     return tgt_obj
 
@@ -255,21 +262,21 @@ def safe_expression(expression):
     return True  # Safe expression
 
 ###############################################################################
-def evaluate_commands(tgt_obj,env_setup=None):
+def evaluate_bash_commands(tgt_obj,env_setup=None):
 ###############################################################################
 
     # Only user-defined types have the __dict__ attribute
     if hasattr(tgt_obj,'__dict__'):
         for name,val in vars(tgt_obj).items():
-            setattr(tgt_obj,name,evaluate_commands(val,env_setup))
+            setattr(tgt_obj,name,evaluate_bash_commands(val,env_setup))
 
     elif isinstance(tgt_obj,dict):
         for name,val in tgt_obj.items():
-            tgt_obj[name] = evaluate_commands(val,env_setup)
+            tgt_obj[name] = evaluate_bash_commands(val,env_setup)
 
     elif isinstance(tgt_obj,list):
         for i,val in enumerate(tgt_obj):
-            tgt_obj[i] = evaluate_commands(val,env_setup)
+            tgt_obj[i] = evaluate_bash_commands(val,env_setup)
 
     elif isinstance(tgt_obj,str):
         pattern = r'\$\((.*?)\)'
