@@ -13,7 +13,7 @@ from .machine       import Machine
 from .build_type    import BuildType
 from .parse_config  import parse_project, parse_machine, parse_builds
 from .utils         import expect, run_cmd, get_current_ref, get_current_sha, is_git_repo, \
-                           check_minimum_python_version, GoodFormatter
+                           check_minimum_python_version, GoodFormatter, get_cpu_ids_from_slurm_env_var
 
 check_minimum_python_version(3, 4)
 
