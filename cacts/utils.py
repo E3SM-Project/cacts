@@ -258,41 +258,8 @@ def safe_expression(expression):
     for pattern in dangerous_patterns:
         if re.search(pattern, expression):
             return False  # Unsafe expression
-    
+
     return True  # Safe expression
-
-###############################################################################
-def evaluate_bash_commands(tgt_obj,env_setup=None):
-###############################################################################
-
-    # Only user-defined types have the __dict__ attribute
-    if hasattr(tgt_obj,'__dict__'):
-        for name,val in vars(tgt_obj).items():
-            setattr(tgt_obj,name,evaluate_bash_commands(val,env_setup))
-
-    elif isinstance(tgt_obj,dict):
-        for name,val in tgt_obj.items():
-            tgt_obj[name] = evaluate_bash_commands(val,env_setup)
-
-    elif isinstance(tgt_obj,list):
-        for i,val in enumerate(tgt_obj):
-            tgt_obj[i] = evaluate_bash_commands(val,env_setup)
-
-    elif isinstance(tgt_obj,str):
-        pattern = r'\$\((.*?)\)'
-
-        matches = re.findall(pattern,tgt_obj)
-        for cmd in matches:
-            stat,out,err = run_cmd(cmd,env_setup=env_setup)
-            expect (stat==0,
-                    "Could not evaluate the command.\n"
-                    f"  - original string: {tgt_obj}\n"
-                    f"  - command: {cmd}\n"
-                    f"  - error: {err}\n")
-
-            tgt_obj = tgt_obj.replace(f"$({cmd})",out)
-
-    return tgt_obj
 
 ###############################################################################
 def str_to_bool(s, var_name):

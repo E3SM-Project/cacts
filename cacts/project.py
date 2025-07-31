@@ -4,7 +4,7 @@ that CACTS will use at runtime
 """
 from dataclasses import dataclass, field
 from typing import Dict, Optional
-from .utils import expect, evaluate_bash_commands
+from .utils import expect
 
 ###############################################################################
 @dataclass
@@ -71,7 +71,3 @@ class Project:
         self.cmake_settings.setdefault('baselines_only',{})
 
         self.cdash = project_specs.get('cdash',{})
-
-    def __post_init__  (self):
-        # Evaluate bash commands of the form $(...)
-        evaluate_bash_commands(self)
