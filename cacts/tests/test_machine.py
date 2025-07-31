@@ -7,7 +7,7 @@ from cacts.machine import Machine
 
 
 @pytest.fixture
-def machine():
+def machine_config():  # Rename from 'machine' to avoid redefinition
     """Create a Machine instance for testing"""
     project = types.SimpleNamespace(name="TestProject")
     machines_specs = {
@@ -25,22 +25,24 @@ def machine():
     return Machine('test_machine', project, machines_specs)
 
 
-def test_initialization(machine):
-    """Test Machine initialization"""
-    assert machine.name == 'test_machine'
-    assert machine.num_bld_res == 2
-    assert machine.num_run_res == 4
-    assert machine.env_setup == ['echo "Setting up test environment"']
+def test_machine_initialization(machine_config_obj):
+    """Test Machine initialization."""
+    machine_obj = machine_config_obj
+    assert machine_obj.name == 'test_machine'
+    assert machine_obj.num_bld_res == 2
+    assert machine_obj.num_run_res == 4
+    assert machine_obj.env_setup == ['echo "Setting up test environment"']
 
 
-def test_uses_gpu(machine):
+def test_machine_uses_gpu(machine_config_obj):
     """Test Machine uses_gpu method"""
+    machine_obj = machine_config_obj
     # Initially should not use GPU
-    assert machine.uses_gpu() is False
+    assert machine_obj.uses_gpu() is False
 
     # After setting gpu_arch, should use GPU
-    machine.gpu_arch = 'test_gpu_arch'
-    assert machine.uses_gpu() is True
+    machine_obj.gpu_arch = 'test_gpu_arch'
+    assert machine_obj.uses_gpu() is True
 
 
 def test_invalid_machine_name():
