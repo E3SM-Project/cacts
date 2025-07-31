@@ -1,6 +1,8 @@
 [project]
 name = "cacts"
 description = "A framework for configurable unit testing of a cmake-based project"
+readme = "readme"
+license = {file = "license"}
 authors = [
   {name = "Luca Bertagna", email = "lbertag@sandia.gov"},
   {name = "James Foucar",  email = "jgfouca@sandia.gov"},
