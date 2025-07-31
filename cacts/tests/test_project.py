@@ -1,4 +1,6 @@
+"""Tests for the Project class in cacts.project module."""
 import pytest
+
 from cacts.project import Project
 
 
@@ -35,7 +37,7 @@ def test_missing_name():
     project_specs = {
         'baseline_gen_label': 'gen_label'
     }
-    
+
     with pytest.raises(RuntimeError, match="Missing required field 'name'"):
         Project(project_specs, '/path/to/root')
 
@@ -46,7 +48,7 @@ def test_unrecognized_keys():
         'name': 'TestProject',
         'invalid_key': 'invalid_value'
     }
-    
+
     with pytest.raises(RuntimeError, match="Unrecognized keys in project_specs: invalid_key"):
         Project(project_specs, '/path/to/root')
 
@@ -63,15 +65,15 @@ def test_default_values():
         'name': 'MinimalProject'
     }
     project = Project(project_specs, '/test/path')
-    
+
     assert project.name == 'MinimalProject'
     assert project.baselines_gen_label is None
     assert project.baselines_cmp_label is None
     assert project.baselines_summary_file is None
     assert project.cdash == {}
     assert project.root_dir == '/test/path'
-    
+
     # Check that cmake_settings subdicts are created
     assert 'baselines_on' in project.cmake_settings
-    assert 'baselines_off' in project.cmake_settings  
+    assert 'baselines_off' in project.cmake_settings
     assert 'baselines_only' in project.cmake_settings
