@@ -19,9 +19,9 @@ jobs:
           python-version: "3.x"
           cache: 'pip' # caching pip dependencies
 
-      - name: Install pylint
+      - name: Install dependencies
         run: |
-          python -m pip install pylint
+          python -m pip install pylint pyyaml psutil
 
       - name: Run pylint
         run: |
