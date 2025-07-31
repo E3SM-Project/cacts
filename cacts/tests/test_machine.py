@@ -1,6 +1,9 @@
-import pytest
-from cacts.machine import Machine
+"""Tests for the Machine class in cacts.machine module."""
 import types
+
+import pytest
+
+from cacts.machine import Machine
 
 
 @pytest.fixture
@@ -34,7 +37,7 @@ def test_uses_gpu(machine):
     """Test Machine uses_gpu method"""
     # Initially should not use GPU
     assert machine.uses_gpu() is False
-    
+
     # After setting gpu_arch, should use GPU
     machine.gpu_arch = 'test_gpu_arch'
     assert machine.uses_gpu() is True
@@ -47,7 +50,7 @@ def test_invalid_machine_name():
         'default': {},
         'valid_machine': {}
     }
-    
+
     with pytest.raises(RuntimeError, match="Machine 'invalid_machine' not found"):
         Machine('invalid_machine', project, machines_specs)
 
@@ -55,6 +58,6 @@ def test_invalid_machine_name():
 def test_invalid_machines_specs_type():
     """Test Machine with invalid machines_specs type"""
     project = types.SimpleNamespace(name="TestProject")
-    
+
     with pytest.raises(RuntimeError, match="Machine constructor expects a dict object"):
         Machine('test', project, "not_a_dict")

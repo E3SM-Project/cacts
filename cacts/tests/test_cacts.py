@@ -1,8 +1,9 @@
-import pytest
-import tempfile
+"""Tests for the main Driver class and entry points in cacts.cacts module."""
 import os
-import yaml
-from unittest.mock import patch, MagicMock
+import tempfile
+from unittest.mock import patch
+
+import pytest
 from cacts.cacts import Driver, parse_command_line
 
 
@@ -32,12 +33,12 @@ configurations:
     cmake_args:
       CMAKE_BUILD_TYPE: Debug
 """
-    
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
         f.write(config_content)
         f.flush()
         yield f.name
-    
+
     # Cleanup
     os.unlink(f.name)
 
@@ -68,11 +69,11 @@ configurations:
     cmake_args:
       CMAKE_BUILD_TYPE: Debug
 """
-    
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
         f.write(config_content)
         f.flush()
-        
+
         try:
             driver = Driver(
                 config_file=f.name,
@@ -81,7 +82,7 @@ configurations:
                 work_dir='/tmp/test',
                 verbose=True
             )
-            
+
             assert driver._verbose is True
             assert str(driver._work_dir).endswith('test')
         finally:
@@ -104,13 +105,13 @@ def test_driver_with_config_file(mock_yaml_load, mock_exists, temp_config_file):
             'debug': {'longname': 'Debug Build', 'cmake_args': {'CMAKE_BUILD_TYPE': 'Debug'}}
         }
     }
-    
+
     driver = Driver(
         config_file=temp_config_file,
         machine_name='test_machine',
         build_types=['debug']
     )
-    
+
     # Basic initialization test - detailed testing would require more complex mocking
     assert str(driver._config_file) == temp_config_file
 
@@ -123,9 +124,9 @@ def test_parse_command_line():
         '--build-types', 'debug',
         '--verbose'
     ]
-    
+
     parsed_args = parse_command_line(args, "Test description", "1.0.0")
-    
+
     assert parsed_args.machine_name == 'test_machine'
     assert parsed_args.build_types == ['debug']
     assert parsed_args.verbose is True
@@ -134,9 +135,9 @@ def test_parse_command_line():
 def test_parse_command_line_minimal():
     """Test command line parsing with minimal arguments"""
     args = ['cacts']
-    
+
     parsed_args = parse_command_line(args, "Test description", "1.0.0")
-    
+
     # Test default values
     assert parsed_args.machine_name is None
     assert parsed_args.verbose is False
@@ -168,16 +169,16 @@ def test_main_function_success(mock_parse_command_line, mock_run):
         'parallel': False,
         'verbose': False
     })()
-    
+
     mock_parse_command_line.return_value = mock_args
     mock_run.return_value = True
-    
+
     from cacts.cacts import main
-    
+
     with patch('cacts.cacts.Driver.__init__', return_value=None):
         with pytest.raises(SystemExit) as exc_info:
             main()
-    
+
         assert exc_info.value.code == 0
         mock_run.assert_called_once()
 
@@ -207,15 +208,15 @@ def test_main_function_failure(mock_parse_command_line, mock_run):
         'parallel': False,
         'verbose': False
     })()
-    
+
     mock_parse_command_line.return_value = mock_args
     mock_run.return_value = False
-    
+
     from cacts.cacts import main
-    
+
     with patch('cacts.cacts.Driver.__init__', return_value=None):
         with pytest.raises(SystemExit) as exc_info:
             main()
-    
+
         assert exc_info.value.code == 1
         mock_run.assert_called_once()

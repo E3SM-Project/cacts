@@ -1,13 +1,14 @@
 """
-Utilities
+Utilities for cacts.py - this has common functionality that is frequently used.
 """
 
-import os
-import sys
-import subprocess
 import argparse
-import psutil
+import os
 import platform
+import subprocess
+import sys
+
+import psutil
 
 ###############################################################################
 def expect(condition, error_msg, exc_type=RuntimeError, error_prefix="ERROR:"):
