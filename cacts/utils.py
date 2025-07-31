@@ -208,58 +208,31 @@ def evaluate_py_expressions(tgt_obj, src_obj_dict):
         end = tgt_obj.rfind("}")
 
         if beg==-1:
-            expect (end==-1, f"Badly formatted expression '{tgt_obj}'.")
+            expect (end==-1,
+                    f"Badly formatted expression '{tgt_obj}'."
+                     "Found '}' but no '${'.")
             return tgt_obj
 
-        expect (end>beg, f"Badly formatted expression '{tgt_obj}'.")
+        expect (end>=0,
+                f"Badly formatted expression '{tgt_obj}'."
+                 "Found '${' but no '}'.")
+        expect (end>beg,
+                f"Badly formatted expression '{tgt_obj}'."
+                 "Found '}' before '${'.")
+        expect (tgt_obj.rfind("${")==beg,
+                f"Badly formatted expression '{tgt_obj}'."
+                 "Multiple ${..} instances found.")
 
         expression = tgt_obj[beg+2:end]
 
-        pattern = r'\b(\w+)\.(\w+)\b'
-        matches = re.findall(pattern,expression)
-        for obj_name, att_name in matches:
-            expect (obj_name in src_obj_dict.keys(),
-                    f"Invalid expression '{obj_name}.{att_name}': '{obj_name}' must be in {src_obj_dict.keys()}")
-
-            expression = expression.replace(f'{obj_name}.{att_name}',f"src_obj_dict['{obj_name}'].{att_name}")
-
-        expect (safe_expression(expression),
-                f"Cannot evaluate expression '{tgt_obj}'. A dangerous pattern was detected in the expression")
-
-        try:
-            result = eval(expression)
-            tgt_obj = tgt_obj[:beg] + str(result) + tgt_obj[end+1:]
-        except AttributeError:
-            print (f"Could not evaluate expression {tgt_obj}.\n")
-            raise
+        restricted_globals = {
+            "__builtins__": None  # Disable all built-in functions
+        }
+        restricted_globals.update(src_obj_dict)
+        result = eval(expression,restricted_globals)
+        tgt_obj = tgt_obj[:beg] + str(result) + tgt_obj[end+1:]
 
     return tgt_obj
-
-#########################################################
-def safe_expression(expression):
-#########################################################
-
-    # List of dangerous patterns
-    dangerous_patterns = [
-        r'\bimport\b',           # Import statements
-        r'\bexec\b',             # Exec statements
-        r'\beval\b',             # Eval statements
-        r'\bos\.system\b',       # OS system calls
-        r'\bsubprocess\.run\b',  # Subprocess calls
-        r'\bglobals\b',          # Globals access
-        r'\blocals\b',           # Locals access
-        r';',                    # Multiple statements
-        r'\bopen\b',             # File access
-        r'\bos\.getenv\b',       # Environment variable access
-        r'\b__\w+__\b'           # Catch all for any double underscore attributes
-    ]
-
-    # Check for any dangerous patterns
-    for pattern in dangerous_patterns:
-        if re.search(pattern, expression):
-            return False  # Unsafe expression
-
-    return True  # Safe expression
 
 ###############################################################################
 def str_to_bool(s, var_name):
