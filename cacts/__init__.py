@@ -2,9 +2,6 @@
 
 from cacts.cacts import main as cacts_main
 from cacts.get_mach_env import print_mach_env
-from cacts.version import VERSION
-
-__version__ = VERSION
 
 def main() -> None:
     """
