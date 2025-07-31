@@ -25,18 +25,20 @@ def machine_config():  # Rename from 'machine' to avoid redefinition
     return Machine('test_machine', project, machines_specs)
 
 
-def test_machine_initialization(machine_config_obj):
+# pylint: disable=redefined-outer-name
+def test_machine_initialization(machine_config):
     """Test Machine initialization."""
-    machine_obj = machine_config_obj
+    machine_obj = machine_config
     assert machine_obj.name == 'test_machine'
     assert machine_obj.num_bld_res == 2
     assert machine_obj.num_run_res == 4
     assert machine_obj.env_setup == ['echo "Setting up test environment"']
 
 
-def test_machine_uses_gpu(machine_config_obj):
+# pylint: disable=redefined-outer-name
+def test_machine_uses_gpu(machine_config):
     """Test Machine uses_gpu method"""
-    machine_obj = machine_config_obj
+    machine_obj = machine_config
     # Initially should not use GPU
     assert machine_obj.uses_gpu() is False
 

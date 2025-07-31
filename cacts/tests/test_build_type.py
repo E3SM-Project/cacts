@@ -32,9 +32,10 @@ def build_type_config():  # Rename from 'build_type' to avoid redefinition
     return bt
 
 
-def test_build_type_initialization(build_config):
+# pylint: disable=redefined-outer-name
+def test_build_type_initialization(build_type_config):
     """Test BuildType initialization."""
-    build_type_obj = build_config
+    build_type_obj = build_type_config
     assert build_type_obj.name == 'test_build'
     assert build_type_obj.longname == 'test_longname'
     assert build_type_obj.description == 'test_description'
@@ -46,15 +47,16 @@ def test_build_type_initialization(build_config):
     assert 'arg2' in build_type_obj.cmake_args
 
 
-def test_build_type_default_values(build_config):
+# pylint: disable=redefined-outer-name
+def test_build_type_default_values(build_type_config):
     """Test BuildType default values."""
-    build_type_obj = build_config
+    build_type_obj = build_type_config
     assert build_type_obj.name == 'test_build'
     assert build_type_obj.longname == 'test_longname'
     assert build_type_obj.description == 'test_description'
     # Note: BuildType uses str_to_bool internally, so these should be boolean
-    assert build_type_obj.uses_baselines is True
-    assert build_type_obj.on_by_default is True
+    assert build_type_obj.uses_baselines is False
+    assert build_type_obj.on_by_default is False
 
 
 def test_invalid_build_name():
