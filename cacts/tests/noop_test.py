@@ -1,8 +1,10 @@
-# define a simple test so that pytest can run
-
-import pytest
-
+"""
+Unit tests for CACTS
+"""
 
 def test_noop():
+    """
+    Dummy function
+    """
     print("noop!")
     assert True

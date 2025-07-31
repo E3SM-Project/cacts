@@ -1,3 +1,8 @@
+"""
+This module provides a utility to print the commands needed
+to correctly setup a machine environment to replicate the
+same environment used by CACTS
+"""
 import os
 import sys
 import pathlib
@@ -11,9 +16,11 @@ check_minimum_python_version(3, 4)
 ###############################################################################
 def print_mach_env():
 ###############################################################################
-    from . import __version__  # Import __version__ here to avoid circular import
+    """
+    Print the env setup command
+    """
 
-    args = vars(parse_command_line(sys.argv, __doc__, __version__))
+    args = vars(parse_command_line(sys.argv, __doc__))
 
     project = parse_project(args['config_file'],args['root_dir'])
     machine = parse_machine(args['config_file'],project,args['machine_name'])
@@ -23,17 +30,23 @@ def print_mach_env():
     sys.exit(0)
 
 ###############################################################################
-def parse_command_line(args, description, version):
+def parse_command_line(args, description):
 ###############################################################################
+    """
+    Parse the command line arguments
+    """
+    cmd = pathlib.Path(args[0]).name
+    # pylint: disable=R0801
     parser = argparse.ArgumentParser(
-        usage="""\n{0} <ARGS> [--verbose]
+        usage=f"""
+{cmd} <ARGS> [--verbose]
 OR
-{0} --help
+{cmd} --help
 
 \033[1mEXAMPLES:\033[0m
     \033[1;32m# Get the env setup command for machine 'foo' using config file my_config.yaml \033[0m
-    > ./{0} foo -f my_config.yaml
-""".format(pathlib.Path(args[0]).name),
+    > ./{cmd} foo -f my_config.yaml
+""",
         description=description,
         formatter_class=GoodFormatter
     )

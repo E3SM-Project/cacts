@@ -4,10 +4,9 @@ Utilities
 
 import os
 import sys
-import re
 import subprocess
-import psutil
 import argparse
+import psutil
 
 ###############################################################################
 def expect(condition, error_msg, exc_type=RuntimeError, error_prefix="ERROR:"):
@@ -27,6 +26,7 @@ def expect(condition, error_msg, exc_type=RuntimeError, error_prefix="ERROR:"):
         raise exc_type(msg)
 
 ###############################################################################
+# pylint: disable=too-many-positional-arguments, too-many-arguments
 def run_cmd(cmd, from_dir=None, verbose=None, dry_run=False, env_setup=None,
             arg_stdout=subprocess.PIPE, arg_stderr=subprocess.PIPE,
             combine_output=False):
@@ -53,24 +53,22 @@ def run_cmd(cmd, from_dir=None, verbose=None, dry_run=False, env_setup=None,
     if dry_run:
         return 0, "", ""
 
-    proc = subprocess.Popen(cmd,
-                            shell=True,
-                            stdout=arg_stdout,
-                            stderr=arg_stderr,
-                            stdin=None,
-                            text=True, # automatically decode output bytes to string
-                            cwd=from_dir)
+    with subprocess.Popen(cmd, shell=True,
+                          stdout=arg_stdout, stderr=arg_stderr,
+                          stdin=None, text=True, # automatically decode output bytes to string
+                          cwd=from_dir) as proc:
 
-    output, errput = proc.communicate(None)
-    if output is not None:
-        output = output.strip()
-    if errput is not None:
-        errput = errput.strip()
-    proc.wait()
+        output, errput = proc.communicate(None)
+        if output is not None:
+            output = output.strip()
+        if errput is not None:
+            errput = errput.strip()
+        proc.wait()
 
-    return proc.returncode, output, errput
+        return proc.returncode, output, errput
 
 ###############################################################################
+# pylint: disable=too-many-positional-arguments, too-many-arguments
 def run_cmd_no_fail(cmd, from_dir=None, verbose=None, dry_run=False,env_setup=None,
                     arg_stdout=subprocess.PIPE, arg_stderr=subprocess.PIPE,
                     combine_output=False):
@@ -79,16 +77,16 @@ def run_cmd_no_fail(cmd, from_dir=None, verbose=None, dry_run=False,env_setup=No
     Wrapper around subprocess to make it much more convenient to run shell commands.
     Expects command to work. Just returns output string.
     """
-    stat, output, errput = run_cmd(cmd, from_dir=from_dir,verbose=verbose,dry_run=dry_run,env_setup=env_setup,
-                                   arg_stdout=arg_stdout,arg_stderr=arg_stderr,
-                                   combine_output=combine_output)
+    stat, out, err = run_cmd(cmd,from_dir=from_dir,verbose=verbose,dry_run=dry_run,
+                             env_setup=env_setup,arg_stdout=arg_stdout,arg_stderr=arg_stderr,
+                            combine_output=combine_output)
     expect (stat==0,
             "Command failed unexpectedly"
             f"  - command: {cmd}"
-            f"  - error: {errput if errput else output}"
+            f"  - error: {err if err else out}"
             f"  - from dir: {from_dir or os.getcwd()}")
 
-    return output
+    return out
 
 ###############################################################################
 def check_minimum_python_version(major, minor):
@@ -99,7 +97,8 @@ def check_minimum_python_version(major, minor):
     >>> check_minimum_python_version(sys.version_info[0], sys.version_info[1])
     >>>
     """
-    msg = "Python " + str(major) + ", minor version " + str(minor) + " is required, you have " + str(sys.version_info[0]) + "." + str(sys.version_info[1])
+    msg = f"Python {major}, minor version {minor} is required." \
+          f"You have {sys.version_info[0]}.{sys.version_info[1]}"
     expect(sys.version_info[0] > major or
            (sys.version_info[0] == major and sys.version_info[1] >= minor), msg)
 
@@ -115,13 +114,11 @@ class GoodFormatter(
     """
 
 ###############################################################################
-###############################################################################
-###############################################################################
-###############################################################################
-###############################################################################
-###############################################################################
 def logical_cores_per_physical_core():
 ###############################################################################
+    """
+    Returns how many logical cores are available on each physical core
+    """
     return psutil.cpu_count() // psutil.cpu_count(logical=False)
 
 ###############################################################################
@@ -136,7 +133,7 @@ def get_cpu_ids_from_slurm_env_var():
     cpu_bind_list = os.getenv('SLURM_CPU_BIND_LIST')
 
     expect (cpu_bind_list is not None,
-            "SLURM_CPU_BIND_LIST environment variable is not set. Check, before calling this function")
+            "SLURM_CPU_BIND_LIST env variable is not set.")
 
     # Remove the '0x' prefix and convert to an integer
     mask_int = int(cpu_bind_list, 16)
@@ -163,12 +160,12 @@ def get_available_cpu_count(logical=True):
 
     if not logical:
         hyperthread_ratio = logical_cores_per_physical_core()
-        return int(cpu_count / hyperthread_ratio)
-    else:
-        return cpu_count
+        cpu_count = int(cpu_count / hyperthread_ratio)
+
+    return cpu_count
 
 ###############################################################################
-class SharedArea(object):
+class SharedArea:
 ###############################################################################
     """
     Enable 0002 umask within this manager
@@ -187,7 +184,17 @@ class SharedArea(object):
 ###############################################################################
 def evaluate_py_expressions(tgt_obj, src_obj_dict):
 ###############################################################################
-
+    """
+    Expand occurrences of ${...} with the evaluation of the content of the
+    parentheses interpreted as a python expression. For security reasons,
+    We severely limit which builtin functions can be used: we only allow
+    basic types (set, list, dict, int, etc) or basic functions (max, min,
+    len, enumerate, etc). The user must also provide a dict str->obj of
+    objects that can be used in these expressions.
+    If the target object is a string, we proceed with the evaluation,
+    while if it is a dict, list, or object, we recursively call the function
+    on its entries/attributes.
+    """
     # Only user-defined types have the __dict__ attribute
     if hasattr(tgt_obj,'__dict__'):
         for name,val in vars(tgt_obj).items():
@@ -244,7 +251,7 @@ def evaluate_py_expressions(tgt_obj, src_obj_dict):
             }
         }
         restricted_globals.update(src_obj_dict)
-        result = eval(expression,restricted_globals)
+        result = eval(expression,restricted_globals) # pylint: disable=eval-used
         tgt_obj = tgt_obj[:beg] + str(result) + tgt_obj[end+1:]
 
     return tgt_obj
@@ -252,13 +259,16 @@ def evaluate_py_expressions(tgt_obj, src_obj_dict):
 ###############################################################################
 def str_to_bool(s, var_name):
 ###############################################################################
+    """
+    Converts a string representation of a bool ('True'/'False') into a bool
+    """
     if s=="True":
         return True
-    elif s=="False":
+    if s=="False":
         return False
-    else:
-        raise ValueError(f"Invalid value '{s}' for '{var_name}'.\n"
-                          "Should be either 'True' or 'False'")
+
+    raise ValueError(f"Invalid value '{s}' for '{var_name}'.\n"
+                      "Should be either 'True' or 'False'")
 
 ###############################################################################
 def is_git_repo(repo=None):

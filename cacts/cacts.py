@@ -1,39 +1,53 @@
+"""
+This module implements the CACTS testing infrastructure, along with the main
+entry point for usage from command line.
+"""
 import os
 import sys
-import pathlib
+from pathlib import Path
 import concurrent.futures as threading
 import shutil
-import psutil
 import json
 import itertools
 import argparse
+import psutil
 
-from .project       import Project
-from .machine       import Machine
-from .build_type    import BuildType
 from .parse_config  import parse_project, parse_machine, parse_builds
 from .utils         import expect, run_cmd, get_current_ref, get_current_sha, is_git_repo, \
-                           check_minimum_python_version, GoodFormatter
+                           check_minimum_python_version, GoodFormatter, \
+                           SharedArea, get_cpu_ids_from_slurm_env_var
+from .version import __version__
 
 check_minimum_python_version(3, 4)
 
 ###############################################################################
 def main():
 ###############################################################################
-    from . import __version__  # Import __version__ here to avoid circular import
+    """
+    Entry point for the command line cacts program
+    """
+
     driver = Driver(**vars(parse_command_line(sys.argv, __doc__, __version__)))
 
     success = driver.run()
 
-    print("OVERALL STATUS: {}".format("PASS" if success else "FAIL"))
+    print(f"OVERALL STATUS: {'PASS' if success else 'FAIL'}")
 
     sys.exit(0 if success else 1)
 
 ###############################################################################
-class Driver(object):
+# pylint: disable=too-many-instance-attributes
+class Driver:
 ###############################################################################
+    """
+    Main CACTS class, responsible of handling the whole execution.
+    It gathers configuration settings, parallelizes the builds,
+    generates cmake/ctest commands, runs the tests, and possibly
+    takes care of updating the baselines
+    """
 
     ###########################################################################
+    # pylint: disable=too-many-positional-arguments, too-many-arguments, too-many-locals, too-many-statements
     def __init__(self, config_file=None,
                  machine_name=None, local=False, build_types=None,
                  work_dir=None, root_dir=None, baseline_dir=None,
@@ -47,7 +61,8 @@ class Driver(object):
         self._generate      = generate
         self._baselines_dir = baseline_dir
         self._cmake_args    = cmake_args
-        self._work_dir      = pathlib.Path(work_dir or os.getcwd()+"/ctest-build").expanduser().absolute()
+        work_dir_str = work_dir or os.getcwd()+"/ctest-build"
+        self._work_dir      = Path(work_dir_str).expanduser().absolute()
         self._verbose       = verbose
         self._config_only   = config_only
         self._build_only    = build_only
@@ -55,10 +70,10 @@ class Driver(object):
         self._skip_build    = skip_build
         self._test_regex    = test_regex
         self._test_labels   = test_labels
-        self._root_dir      = pathlib.Path(root_dir or os.getcwd()).expanduser().absolute()
+        self._root_dir      = Path(root_dir or os.getcwd()).expanduser().absolute()
         self._machine       = None
         self._builds        = []
-        self._config_file   = pathlib.Path(config_file or self._root_dir / "cacts.yaml")
+        self._config_file   = Path(config_file or self._root_dir / "cacts.yaml")
 
         # Ensure work dir exists
         self._work_dir.mkdir(parents=True,exist_ok=True)
@@ -73,8 +88,11 @@ class Driver(object):
                 "Makes no sense to use -m/--machine and -l/--local at the same time")
 
         self._project = parse_project(self._config_file,self._root_dir)
-        self._machine = parse_machine(self._config_file,self._project,'local' if local else machine_name)
-        self._builds  = parse_builds(self._config_file,self._project,self._machine,self._generate,build_types)
+        if local:
+            machine_name = 'local'
+        self._machine = parse_machine(self._config_file,self._project,machine_name)
+        self._builds  = parse_builds(self._config_file,self._project,
+                                     self._machine,self._generate,build_types)
 
         ###################################
         #          Sanity Checks          #
@@ -87,11 +105,15 @@ class Driver(object):
         expect (not (self._generate and self._skip_config),
                 "We do not allow to skip config/build phases when generating baselines.\n")
 
-        # We print some git sha info (as well as store it in baselines) so make sure we are in a git repo
+        # We print some git sha info (as well as store it in baselines),
+        # so make sure we are in a git repo
         expect(is_git_repo(self._root_dir),
-               f"Root dir: {self._root_dir}, does not appear to be a git repo. Did you forget to pass -r <repo-root>?")
+               f"Root dir: {self._root_dir}, does not appear to be a git repo.\n"
+                "Did you forget to pass -r <repo-root>?")
 
-        # If we submit, we must a) not be generating, and b) be able to find the CTestConfig.cmake script in the root dir
+        # If we submit, we must a) not be generating, and b) be able to find
+        # the CTestConfig.cmake script in the root dir or have cdash options
+        # from the project configuration settings
         if self._submit:
             expect (not self._generate,
                     "Cannot submit to cdash when generating baselines. Re-run without -g.")
@@ -100,7 +122,8 @@ class Driver(object):
             cdash = self._project.cdash
             expect (cdash.get('ctest_config_file',None) or
                     (cdash.get('drop_site',None) and cdash.get('drop_location',None)),
-                    "Cannot submit to cdash, since project.cdash.url is not set. Please fix your yaml config file.\n")
+                    "Cannot submit to cdash, since project.cdash.url is not set.\n"
+                    "Please fix your yaml config file.\n")
 
         ###################################
         #      Compute baseline info      #
@@ -108,12 +131,15 @@ class Driver(object):
 
         if self._baselines_dir:
             if self._baselines_dir.casefold() == "AUTO".casefold():
-                self._baselines_dir = pathlib.Path(self._machine.baselines_dir).expanduser().absolute()
+                self._baselines_dir = Path(self._machine.baselines_dir)
             else:
-                self._baselines_dir = pathlib.Path(self._baselines_dir).expanduser().absolute()
+                self._baselines_dir = Path(self._baselines_dir)
+
+            self._baselines_dir = self._baselines_dir.expanduser().absolute()
 
             expect (self._work_dir != self._baselines_dir,
-                    f"For your safety, do NOT use the work dir to store baselines. Use a different one (a subdirectory works too).")
+                    "For your safety, do NOT use the work dir to store baselines.\n"
+                    "Use a different one (a subdirectory works too).")
 
             if not self._generate:
                 self.check_baselines_are_present()
@@ -136,7 +162,7 @@ class Driver(object):
             # Our way of partitioning the compute node among the different builds only
             # works if the number of bld/run resources is no-less than the number of builds
             expect (self._machine.num_run_res>=len(self._builds),
-                    "Cannot process build types in parallel, since we don't have enough resources.\n"
+                    "Cannot process build types in parallel; not enough resources.\n"
                     f" - build types: {','.join(b.name for b in self._builds)}\n"
                     f" - num run res: {self._machine.num_run_res}")
 
@@ -148,8 +174,8 @@ class Driver(object):
                 b.testing_res_count = num_bld_res_left // num_left
                 b.compile_res_count = num_run_res_left // num_left
 
-                num_bld_res_left -= b.compile_res_count;
-                num_run_res_left -= b.testing_res_count;
+                num_bld_res_left -= b.compile_res_count
+                num_run_res_left -= b.testing_res_count
         else:
             # We can use all the res on the node
             for b in self._builds:
@@ -157,15 +183,19 @@ class Driver(object):
                 b.compile_res_count = self._machine.num_bld_res
 
     ###############################################################################
+    # pylint: disable=too-many-locals
     def run(self):
     ###############################################################################
+        """
+        Runs tests or generate baselines for all the requested configurations.
+        """
 
         git_ref = get_current_ref ()
         git_sha = get_current_sha (short=True)
 
         print("###############################################################################")
         action = "Generating baselines" if self._generate else "Running tests"
-        print(f"{action} with git ref '{git_ref}' (sha={git_sha}) on machine '{self._machine.name}'")
+        print(f"{action} with git ref '{git_ref}' ({git_sha}) on machine '{self._machine.name}'")
         if self._baselines_dir:
             print(f"  Baselines directory: {self._baselines_dir}")
         print(f"  Active builds: {', '.join(b.name for b in self._builds)}")
@@ -195,16 +225,20 @@ class Driver(object):
                 last_build  = self.get_last_ctest_file(b,"Build")
                 last_config = self.get_last_ctest_file(b,"Configure")
                 if last_submit is not None:
-                    print(f"Build type {b.longname} failed at submit time. Here's the content of {last_submit}:")
+                    print(f"Build type {b.longname} failed at submit time.\n"
+                          f"Here's the content of {last_submit}:")
                     print (last_submit.read_text())
                 if last_test is not None:
-                    print(f"Build type {b.longname} failed at testing time. Here's the content of {last_test}:")
+                    print(f"Build type {b.longname} failed at testing time.\n"
+                          f"Here's the content of {last_test}:")
                     print (last_test.read_text())
                 elif last_build is not None:
-                    print(f"Build type {b.longname} failed at build time. Here's the content of {last_build}:")
+                    print(f"Build type {b.longname} failed at build time.\n"
+                          f"Here's the content of {last_build}:")
                     print (last_build.read_text())
                 elif last_config is not None:
-                    print(f"Build type {b.longname} failed at config time. Here's the content of {last_config}:")
+                    print(f"Build type {b.longname} failed at config time.\n"
+                          f"Here's the content of {last_config}:")
                     print (last_config.read_text())
                 else:
                     print(f"Build type {b.longname} failed before configure step.")
@@ -212,8 +246,12 @@ class Driver(object):
         return success
 
     ###############################################################################
+    # pylint: disable=too-many-locals
     def run_build(self,build):
     ###############################################################################
+        """
+        Runs tests or generate baselines for a particular configurations.
+        """
 
         build_dir = self._work_dir / build.longname
         if self._skip_config:
@@ -246,21 +284,23 @@ class Driver(object):
 
         # Run ctest
         env_setup = " && ".join(self._machine.env_setup)
-        stat, _, _ = run_cmd(ctest_cmd,arg_stdout=None,arg_stderr=None,env_setup=env_setup,from_dir=build_dir,verbose=True)
+        stat, _, _ = run_cmd(ctest_cmd,arg_stdout=None,arg_stderr=None,env_setup=env_setup,
+                             from_dir=build_dir,verbose=True)
         success = stat==0
 
         if self._generate and success:
 
             # Read list of nc files to copy to baseline dir
             if self._project.baselines_summary_file is not None:
-                with open(build_dir/self._project.baselines_summary_file,"r",encoding="utf-8") as fd:
+                summary_file = build_dir / self._project.baselines_summary_file
+                with open(summary_file,"r",encoding="utf-8") as fd:
                     files = fd.read().splitlines()
 
                     with SharedArea():
                         for fn in files:
                             # In case appending to the file leaves an empty line at the end
                             if fn != "":
-                                src = pathlib.Path(fn)
+                                src = Path(fn)
                                 dst = baseline_dir / "data" / src.name
                                 shutil.copyfile(src, dst)
 
@@ -276,6 +316,9 @@ class Driver(object):
     ###############################################################################
     def create_ctest_resource_file(self, build, build_dir):
     ###############################################################################
+        """
+        Generate the ctest resource-spec-file used to spread tests across resources
+        """
         # Create a json file in the build dir, which ctest will then use
         # to schedule tests in parallel.
         # In the resource file, we have N res groups with 1 slot, with N being
@@ -308,6 +351,9 @@ class Driver(object):
     ###############################################################################
     def get_taskset_resources(self, build, for_compile):
     ###############################################################################
+        """
+        Get the list of resources for this build, which we can later use with 'taskset' cmd
+        """
         res_name = "compile_res_count" if for_compile else "testing_res_count"
 
         if not for_compile and self._machine.uses_gpu():
@@ -328,7 +374,9 @@ class Driver(object):
             offset = 0
 
         expect(offset < len(affinity_cp),
-               f"Offset {offset} out of bounds (max={len(affinity_cp)}) for build {build}\naffinity_cp: {affinity_cp}")
+               f"Offset {offset} out of bounds (max={len(affinity_cp)})\n"
+               f"  - build: {build}\n"
+               f"  - affinity_cp: {affinity_cp}")
         resources = []
         for i in range(0, getattr(build, res_name)):
             resources.append(affinity_cp[offset+i])
@@ -338,6 +386,10 @@ class Driver(object):
     ###############################################################################
     def get_last_ctest_file(self,build,phase):
     ###############################################################################
+        """
+        Get the most recent file generated by CTest for this build and for the
+        requested ctest execution phase (Configure, Build, Test, etc)
+        """
         build_dir = self._work_dir / build.longname
         logs_dir = build_dir / "Testing/Temporary"
         files = list(logs_dir.glob(f"Last{phase}*"))
@@ -349,6 +401,9 @@ class Driver(object):
     ###############################################################################
     def generate_cmake_config(self, build):
     ###############################################################################
+        """
+        Generate the list of CMake options for this build
+        """
 
         cmake_config = ""
         if self._machine.mach_file is not None:
@@ -366,7 +421,7 @@ class Driver(object):
         if self._machine.ftn_compiler is not None:
             cmake_config += f" -DCMAKE_Fortran_COMPILER={self._machine.ftn_compiler}"
 
-        proj_cmake_settings = self._project.cmake_settings;
+        proj_cmake_settings = self._project.cmake_settings
         if self._enable_baselines_tests:
             # If the project has cmake vars to set in order to ENABLE baseline tests,
             # set these vars to the specified values
@@ -402,6 +457,9 @@ class Driver(object):
     ###############################################################################
     def generate_ctest_cmd(self, build, cmake_config):
     ###############################################################################
+        """
+        Generate the ctest command to run
+        """
 
         ctest_cmd = "ctest"
         ctest_cmd += " -VV" if self._verbose else " --output-on-failure"
@@ -412,19 +470,24 @@ class Driver(object):
         if self._submit:
             ctest_cmd += " -D Experimental"
 
-        ctest_cmd += f' --resource-spec-file {self._work_dir}/{build.longname}/ctest_resource_file.json'
+        ctest_res_file = f"{self._work_dir}/{build.longname}/ctest_resource_file.json"
+        ctest_cmd += f' --resource-spec-file {ctest_res_file}'
 
         # If the build is not concurrent to other builds, this is not really necessary,
         # since we can use the whole node.
         if self._parallel:
             resources = self.get_taskset_resources(build, for_compile=True)
-            ctest_cmd = f"taskset -c {','.join([str(r) for r in resources])} sh -c '{cmd}'"
+            ctest_cmd = f"taskset -c {','.join([str(r) for r in resources])} sh -c '{ctest_cmd}'"
 
         return ctest_cmd
 
     ###############################################################################
+    # pylint: disable=too-many-statements
     def generate_ctest_script(self,build):
     ###############################################################################
+        """
+        Generate ctest_script.cmake in the build folder, which will be fed to ctest
+        """
 
         text = '# This file was automatically generated by CACTS.\n'
         text += f'# CACTS yaml config file: {self._config_file}\n\n'
@@ -438,7 +501,8 @@ class Driver(object):
         if self._submit:
             cdash = self._project.cdash
             text += '# Submission specs\n'
-            text += f'set(CTEST_BUILD_NAME {self._project.cdash.get("build_prefix","")+build.longname})\n'
+            build_name = self._project.cdash.get("build_prefix","")+build.longname
+            text += f'set(CTEST_BUILD_NAME {build_name})\n'
             text += f'set(CTEST_SITE {self._machine.name})\n'
             text += f'set(CTEST_DROP_SITE {cdash["drop_site"]})\n'
             text += f'set(CTEST_DROP_LOCATION {cdash["drop_location"]})\n'
@@ -460,7 +524,8 @@ class Driver(object):
 
         if not self._config_only:
             text += '# Build phase\n'
-            text += f'ctest_build(FLAGS "-j{build.compile_res_count}" RETURN_VALUE BUILD_ERROR_CODE)\n'
+            text += f'ctest_build(FLAGS "-j{build.compile_res_count}"\n'
+            text +=  '            RETURN_VALUE BUILD_ERROR_CODE)\n'
             text += 'if (BUILD_ERROR_CODE)\n'
             text += '  message (FATAL_ERROR "CTest failed during build phase")\n'
             text += 'endif()\n\n'
@@ -491,11 +556,14 @@ class Driver(object):
 
                 if self._submit:
                     text += '# Submit phase\n'
-                    text += 'ctest_submit(RETRY_COUNT 10 RETRY_DELAY 60 RETURN_VALUE SUBMIT_ERROR_CODE)\n'
+                    text += 'ctest_submit(RETRY_COUNT 10 RETRY_DELAY 60\n'
+                    text += '             RETURN_VALUE SUBMIT_ERROR_CODE)\n'
                     text += 'if (SUBMIT_ERROR_CODE)\n'
                     text += '  message (FATAL_ERROR "CTest failed during submit phase")\n'
                     text += 'endif()\n'
-        with open( self._work_dir / build.longname / "ctest_script.cmake", 'w') as fd:
+
+        ctest_script_file = self._work_dir / build.longname / "ctest_script.cmake"
+        with open( ctest_script_file, 'w', encoding='utf-8') as fd:
             fd.write(text)
 
     ###############################################################################
@@ -525,21 +593,27 @@ class Driver(object):
 ###############################################################################
 def parse_command_line(args, description, version):
 ###############################################################################
+    """
+    Parse command line options for cacts
+    """
+    cmd = Path(args[0]).name
+    # pylint: disable=R0801
     parser = argparse.ArgumentParser(
-        usage="""\n{0} <ARGS> [--verbose]
+        usage=f"""
+{cmd} <ARGS> [--verbose]
 OR
-{0} --help
+{cmd} --help
 
 \033[1mEXAMPLES:\033[0m
     \033[1;32m# Run all tests on machine 'foo', using yaml config file /bar.yaml \033[0m
-    > cd $scream_repo/components/eamxx
-    > ./scripts/{0} -m foo -f /bar.yaml
-""".format(pathlib.Path(args[0]).name),
+    > {cmd} -m foo -f /bar.yaml
+""",
         description=description,
         formatter_class=GoodFormatter
     )
 
-    parser.add_argument("-f","--config-file", help="YAML file containing valid project/machine settings")
+    parser.add_argument("-f","--config-file",
+        help="YAML file containing valid project/machine settings")
 
     parser.add_argument("-m", "--machine-name",
         help="The name of the machine where we're testing. Must be found in machine_specs.py")
@@ -547,7 +621,7 @@ OR
         help="Allow to look for machine configuration in ~/.cime/catcs.yaml. "
              "The file should contain the machines section, with a machine called 'local'.")
     parser.add_argument("-t", "--build-types", action="extend", nargs='+', default=[],
-                        help=f"Only run specific test configurations")
+        help="Only run specific test configurations")
 
     parser.add_argument("-w", "--work-dir",
         help="The work directory where all the building/testing will happen. "
@@ -556,41 +630,40 @@ OR
         help="The root directory of the project (where the main CMakeLists.txt file is located)")
     parser.add_argument("-b", "--baseline-dir",
         help="Directory where baselines should be read/written from/to (depending if -g is used). "
-             "Default is None which skips all baseline tests. AUTO means use machine-defined folder.")
+             "Default is None (skips all baseline tests). AUTO means use machine-defined folder.")
 
     parser.add_argument("-c", "--cmake-args", nargs='+', action="extend", default=[],
-            help="Extra custom options to pass to cmake. Can use multiple times for multiple cmake options. "
-                 "The -D is added for you, so just do VAR=VALUE. These value will supersed any other setting "
-                 "(including machine/build specs)")
+        help="Extra custom options to pass to cmake. Can use multiple times for multiple cmake "
+             "options. The -D is added for you, so just do VAR=VALUE. These value will supersed "
+             "any other setting (including machine/build specs)")
     parser.add_argument("--test-regex",
-                        help="Limit ctest to running only tests that match this regex")
+        help="Limit ctest to running only tests that match this regex")
     parser.add_argument("--test-labels", nargs='+', default=[],
-                        help="Limit ctest to running only tests that match this label")
-
+        help="Limit ctest to running only tests that match this label")
 
     parser.add_argument("--config-only", action="store_true",
-            help="Only run config step, skip build and tests")
+        help="Only run config step, skip build and tests")
     parser.add_argument("--build-only", action="store_true",
-            help="Only run config and build steps, skip tests (implies --no-build)")
+        help="Only run config and build steps, skip tests (implies --no-build)")
 
     parser.add_argument("--skip-config", action="store_true",
-            help="Skip cmake phase, pass directly to build. Requires the build directory to exist, "
+        help="Skip cmake phase, pass directly to build. Requires the build directory to exist, "
                  "and will fail if cmake phase never completed in that dir.")
     parser.add_argument("--skip-build", action="store_true",
-            help="Skip build phase, pass directly to test. Requires the build directory to exist, "
-                 "and will fail if build phase never completed in that dir (implies --skip-config).")
+        help="Skip build phase, pass directly to test. Requires the build directory to exist, "
+             "and will fail if build phase never completed in that dir (implies --skip-config).")
 
     parser.add_argument("-g", "--generate", action="store_true",
         help="Instruct test-all-eamxx to generate baselines from current commit. Skips tests")
 
     parser.add_argument("-s", "--submit", action="store_true", help="Submit results to dashboad")
     parser.add_argument("-p", "--parallel", action="store_true",
-                        help="Launch the different build types stacks in parallel")
+        help="Launch the different build types stacks in parallel")
 
     parser.add_argument("-v", "--verbose", action="store_true",
-        help="Print output of config/build/test phases as they would be printed by running them manually.")
+        help="Print output of config/build/test phases as they would be printed by a manual run.")
 
     parser.add_argument("--version", action="version", version=f"%(prog)s {version}",
-                        help="Show the version number and exit")
+        help="Show the version number and exit")
 
     return parser.parse_args(args[1:])
