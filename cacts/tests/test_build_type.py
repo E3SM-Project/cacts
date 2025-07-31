@@ -63,5 +63,6 @@ def test_invalid_builds_specs_type():
     project = types.SimpleNamespace(name="TestProject")
     machine = types.SimpleNamespace(name="TestMachine")
 
-    with pytest.raises(RuntimeError, match="BuildType constructor expects a dict object"):
+    with pytest.raises(RuntimeError, 
+                       match="Error! Invalid type for build_specs arg to BuildType constructor"):
         BuildType('test', project, machine, "not_a_dict")
