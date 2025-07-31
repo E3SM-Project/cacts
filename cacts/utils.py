@@ -226,7 +226,22 @@ def evaluate_py_expressions(tgt_obj, src_obj_dict):
         expression = tgt_obj[beg+2:end]
 
         restricted_globals = {
-            "__builtins__": None  # Disable all built-in functions
+            "__builtins__": {
+                "str": str,
+                "int": int,
+                "float": float,
+                "list": list,
+                "set": set,
+                "tuple": tuple,
+                "dict": dict,
+                "enumerate": enumerate,
+                "len": len,
+                "sum": sum,
+                "abs": abs,
+                "max": max,
+                "min": min,
+                "round": round
+            }
         }
         restricted_globals.update(src_obj_dict)
         result = eval(expression,restricted_globals)
