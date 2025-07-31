@@ -7,7 +7,7 @@ from cacts.build_type import BuildType
 
 
 @pytest.fixture
-def build_type():
+def build_type_config():  # Rename from 'build_type' to avoid redefinition
     """Create a BuildType instance for testing"""
     name = 'test_build'
     project = types.SimpleNamespace(name="TestProject")
@@ -32,17 +32,29 @@ def build_type():
     return bt
 
 
-def test_initialization(build_type):
-    """Test BuildType initialization"""
-    assert build_type.name == 'test_build'
-    assert build_type.longname == 'test_longname'
-    assert build_type.description == 'test_description'
+def test_build_type_initialization(build_config):
+    """Test BuildType initialization."""
+    build_type_obj = build_config
+    assert build_type_obj.name == 'test_build'
+    assert build_type_obj.longname == 'test_longname'
+    assert build_type_obj.description == 'test_description'
     # Note: BuildType uses str_to_bool internally, so these should be boolean
-    assert build_type.uses_baselines is False
-    assert build_type.on_by_default is False
+    assert build_type_obj.uses_baselines is False
+    assert build_type_obj.on_by_default is False
     # cmake_args should merge default and specific build args
-    assert 'arg1' in build_type.cmake_args
-    assert 'arg2' in build_type.cmake_args
+    assert 'arg1' in build_type_obj.cmake_args
+    assert 'arg2' in build_type_obj.cmake_args
+
+
+def test_build_type_default_values(build_config):
+    """Test BuildType default values."""
+    build_type_obj = build_config
+    assert build_type_obj.name == 'test_build'
+    assert build_type_obj.longname == 'test_longname'
+    assert build_type_obj.description == 'test_description'
+    # Note: BuildType uses str_to_bool internally, so these should be boolean
+    assert build_type_obj.uses_baselines is True
+    assert build_type_obj.on_by_default is True
 
 
 def test_invalid_build_name():
@@ -54,7 +66,8 @@ def test_invalid_build_name():
         'valid_build': {}
     }
 
-    with pytest.raises(RuntimeError, match="BuildType 'invalid_build' not found"):
+    with pytest.raises(RuntimeError,
+                       match="BuildType 'invalid_build' not found"):
         BuildType('invalid_build', project, machine, builds_specs)
 
 
@@ -63,6 +76,7 @@ def test_invalid_builds_specs_type():
     project = types.SimpleNamespace(name="TestProject")
     machine = types.SimpleNamespace(name="TestMachine")
 
-    with pytest.raises(RuntimeError, 
-                       match="Error! Invalid type for build_specs arg to BuildType constructor"):
+    with pytest.raises(RuntimeError,
+                       match="Error! Invalid type for build_specs arg "
+                             "to BuildType constructor"):
         BuildType('test', project, machine, "not_a_dict")

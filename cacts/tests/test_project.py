@@ -5,7 +5,7 @@ from cacts.project import Project
 
 
 @pytest.fixture
-def project():
+def project_config():  # Rename from 'project' to avoid redefinition
     """Create a Project instance for testing"""
     project_specs = {
         'name': 'TestProject',
@@ -22,14 +22,15 @@ def project():
     return Project(project_specs, root_dir)
 
 
-def test_initialization(project):
-    """Test Project initialization"""
-    assert project.name == 'TestProject'
-    assert project.baselines_gen_label == 'gen_label'
-    assert project.baselines_cmp_label == 'cmp_label'
-    assert project.baselines_summary_file == 'summary_file'
-    assert project.cdash == {'key1': 'value1'}
-    assert project.root_dir == '/path/to/root'
+def test_project_initialization(project_obj):
+    """Test Project initialization."""
+    project_instance = project_obj
+    assert project_instance.name == 'TestProject'
+    assert project_instance.baselines_gen_label == 'gen_label'
+    assert project_instance.baselines_cmp_label == 'cmp_label'
+    assert project_obj.baselines_summary_file == 'summary_file'
+    assert project_obj.cdash == {'key1': 'value1'}
+    assert project_obj.root_dir == '/path/to/root'
 
 
 def test_missing_name():
@@ -77,3 +78,26 @@ def test_default_values():
     assert 'baselines_on' in project.cmake_settings
     assert 'baselines_off' in project.cmake_settings
     assert 'baselines_only' in project.cmake_settings
+
+
+def test_project_baseline_functionality():
+    """Test Project baseline functionality."""
+    project_obj = Project({
+        'name': 'TestProject',
+        'baseline_gen_label': 'gen_label',
+        'baseline_cmp_label': 'cmp_label',
+        'baseline_summary_file': 'summary_file',
+        'cmake_settings': {
+            'baselines_on': {'var1': 'value1'},
+            'baselines_off': {'var2': 'value2'}
+        },
+        'cdash': {'key1': 'value1'}
+    }, '/path/to/root')
+
+    # Test baseline functionality
+    assert project_obj.baselines_gen_label == 'gen_label'
+    assert project_obj.baselines_cmp_label == 'cmp_label'
+    assert 'baselines_on' in project_obj.cmake_settings
+    assert 'baselines_off' in project_obj.cmake_settings
+
+    # Add tests specific to baseline functionality here
