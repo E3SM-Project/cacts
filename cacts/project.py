@@ -57,7 +57,7 @@ class Project:
         # baselines files that need to be copied to the baseline dir. This allows
         # CACTS to ensure that ALL baselines tests complete sucessfully before copying
         # any file to the baselines directory
-        self.baselines_summary_file = project_specs.get('baselines_summary_file',None)
+        self.baselines_summary_file = project_specs.get('baseline_summary_file',None)
 
         # Allow to use a project cmake var that can turn on/off baseline-related code/tests.
         # Can help to limit build time
