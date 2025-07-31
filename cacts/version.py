@@ -1,0 +1,6 @@
+"""
+Define CACTS version
+NOTE: we put it here, rather than in __init__.py, so we can
+avoid pylint cyclic imports errors
+"""
+VERSION = "0.2.3"

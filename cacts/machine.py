@@ -10,10 +10,10 @@ import re
 from .utils import expect, get_available_cpu_count, evaluate_py_expressions
 
 ###############################################################################
-class Machine:
+class Machine: # pylint: disable=too-many-instance-attributes
 ###############################################################################
     """
-    Parent class for objects describing a machine to use for EAMxx standalone testing.
+    An object storing configuration settings for a machine
     """
 
     def __init__ (self,name,project,machines_specs):
@@ -82,20 +82,25 @@ class Machine:
         expect (self.mach_file is None or pathlib.Path(self.mach_file).expanduser().exists(),
                 f"Invalid/non-existent machine file '{self.mach_file}'")
         expect (isinstance(self.env_setup,list),
-                f"machine->env_setup should be a list of strings (got {type(self.env_setup)} instead).\n")
+                "machine->env_setup type error\n"
+                " - expected type: list of strings\n"
+               f" - actual type  : {type(self.env_setup)}.\n")
 
         try:
             self.num_bld_res = int(self.num_bld_res)
-        except ValueError as e:
-            print(f"Cannot convert 'num_bld_res' entry to an integer. Please, fix the config file.\n")
+        except ValueError:
+            print("Error! Cannot convert 'num_bld_res' entry to an integer.")
             raise
         try:
             self.num_run_res = int(self.num_run_res)
-        except ValueError as e:
-            print(f"Cannot convert 'num_run_res' entry to an integer. Please, fix the config file.\n")
+        except ValueError:
+            print("Error! Cannot convert 'num_run_res' entry to an integer.\n")
             raise
 
     def update_params(self,machines_specs,name):
+        """
+        Updates the attributes of this object by reading the input dictionary
+        """
         if name in machines_specs.keys():
             props = machines_specs[name]
             if 'inherits' in props.keys():
@@ -103,4 +108,7 @@ class Machine:
             self.__dict__.update(props)
 
     def uses_gpu (self):
+        """
+        Whether this machine uses GPU accelerators or not
+        """
         return self.gpu_arch is not None

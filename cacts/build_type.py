@@ -1,9 +1,12 @@
-import re
+"""
+This module defines a BuildType object, which stores properties and settings
+for a particular project configuration to be tested by CACTS
+"""
 
 from .utils import expect, evaluate_py_expressions, str_to_bool
 
 ###############################################################################
-class BuildType(object):
+class BuildType: # pylint: disable=R0902, R0903
 ###############################################################################
     """
     Class of predefined build types for the project.
@@ -13,10 +16,13 @@ class BuildType(object):
     def __init__(self, name, project, machine, builds_specs):
         # Check inputs
         expect (isinstance(builds_specs,dict),
-                f"BuildType constructor expects a dict object for 'builds_specs' (got {type(builds_specs)} instead).\n")
-        expect (name in builds_specs.keys(),
+                "Error! Invalid type for build_specs arg to BuildType constructor.\n"
+                " - expected type: dict\n"
+               f" - actual type  : {type(builds_specs)}")
+        keys = builds_specs.keys()
+        expect (name in keys,
                 f"BuildType '{name}' not found in the 'build_types' section of the config file.\n"
-                f" - available build types: {','.join(b for b in builds_specs.keys() if b!='default')}\n")
+                f" - available build types: {','.join(b for b in keys if b!='default')}\n")
 
         self.name = name
 
@@ -69,9 +75,9 @@ class BuildType(object):
         evaluate_py_expressions(self,objects)
 
         # After vars expansion, these two must be convertible to bool
-        if type(self.uses_baselines) is str:
+        if isinstance(self.uses_baselines,str):
             self.uses_baselines = str_to_bool(self.uses_baselines,f"{name}.uses_baselines")
-        if type(self.on_by_default) is str:
+        if isinstance(self.on_by_default,str):
             self.on_by_default  = str_to_bool(self.on_by_default,f"{name}.on_by_default")
 
         # Properties set at runtime by the TestProjBuild
@@ -80,6 +86,9 @@ class BuildType(object):
         self.baselines_missing = False
 
     def update_params(self,builds_specs,name):
+        """
+        Updates the attributes of this object by reading the input dictionary
+        """
         if name in builds_specs.keys():
             props = builds_specs[name]
             if 'inherits' in props.keys():
