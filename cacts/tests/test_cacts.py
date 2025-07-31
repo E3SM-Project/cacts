@@ -89,7 +89,7 @@ configurations:
             os.unlink(f.name)
 
 
-@patch('cacts.cacts.pathlib.Path.exists')
+@patch('cacts.cacts.Path.exists')
 @patch('yaml.load')
 def test_driver_with_config_file(mock_yaml_load, mock_exists, temp_config_file):
     """Test Driver initialization with config file"""
