@@ -22,15 +22,16 @@ def project_config():  # Rename from 'project' to avoid redefinition
     return Project(project_specs, root_dir)
 
 
-def test_project_initialization(project_obj):
+# pylint: disable=redefined-outer-name
+def test_project_initialization(project_config):
     """Test Project initialization."""
-    project_instance = project_obj
+    project_instance = project_config
     assert project_instance.name == 'TestProject'
     assert project_instance.baselines_gen_label == 'gen_label'
     assert project_instance.baselines_cmp_label == 'cmp_label'
-    assert project_obj.baselines_summary_file == 'summary_file'
-    assert project_obj.cdash == {'key1': 'value1'}
-    assert project_obj.root_dir == '/path/to/root'
+    assert project_instance.baselines_summary_file == 'summary_file'
+    assert project_instance.cdash == {'key1': 'value1'}
+    assert project_instance.root_dir == '/path/to/root'
 
 
 def test_missing_name():

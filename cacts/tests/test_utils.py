@@ -11,7 +11,7 @@ from cacts.utils import (
 # from cacts.utils import evaluate_py_expressions  # Import issue with pylint
 
 
-class TestMockObject:
+class MockObject:
     """Mock object class for testing"""
     # pylint: disable=too-few-public-methods
     def __init__(self):

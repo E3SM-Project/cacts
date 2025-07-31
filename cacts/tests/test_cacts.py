@@ -92,10 +92,12 @@ configurations:
 
 @patch('cacts.cacts.Path.exists')
 @patch('yaml.load')
-def test_driver_with_config_file(mock_yaml_load, mock_exists, config_file):
+# pylint: disable=redefined-outer-name
+def test_driver_with_config_file(mock_yaml_load, mock_exists,
+                                 temp_config_file):
     """Test Driver initialization with config file"""
     # Silence the unused parameter warning
-    _ = config_file
+    _ = temp_config_file
     mock_exists.return_value = True
     mock_yaml_load.return_value = {
         'project': {'name': 'TestProject'},
