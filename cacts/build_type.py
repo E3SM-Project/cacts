@@ -1,6 +1,6 @@
 import re
 
-from .utils import expect, evaluate_py_expressions, evaluate_bash_commands, str_to_bool
+from .utils import expect, evaluate_py_expressions, str_to_bool
 
 ###############################################################################
 class BuildType(object):
@@ -67,9 +67,6 @@ class BuildType(object):
             'build'   : self
         }
         evaluate_py_expressions(self,objects)
-
-        # Evaluate remaining bash commands of the form $(...)
-        evaluate_bash_commands(self," && ".join(machine.env_setup))
 
         # After vars expansion, these two must be convertible to bool
         if type(self.uses_baselines) is str:

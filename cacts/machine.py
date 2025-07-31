@@ -7,7 +7,7 @@ import pathlib
 import socket
 import re
 
-from .utils import expect, get_available_cpu_count, evaluate_py_expressions, evaluate_bash_commands
+from .utils import expect, get_available_cpu_count, evaluate_py_expressions
 
 ###############################################################################
 class Machine:
@@ -77,9 +77,6 @@ class Machine:
             'machine' : self,
         }
         evaluate_py_expressions(self,objects)
-
-        # Evaluate remaining bash commands of the form $(...)
-        evaluate_bash_commands(self)
 
         # Check props are valid
         expect (self.mach_file is None or pathlib.Path(self.mach_file).expanduser().exists(),
