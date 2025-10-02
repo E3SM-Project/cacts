@@ -6,6 +6,7 @@ for a testing machine to be used by CACTS
 import pathlib
 import socket
 import re
+import os
 
 from .utils import expect, get_available_cpu_count, evaluate_py_expressions
 
@@ -57,6 +58,7 @@ class Machine: # pylint: disable=too-many-instance-attributes
         self.baselines_dir  = None
         self.valg_supp_file = None
         self.inherits       = None
+        self.work_dir       = os.getcwd() + "/ctest-build"
 
         # Set parameter, first using the 'default' machine (if any), then this machine's settings
         # Note: if this machine inherits from M2, M2's settings will be parsed first

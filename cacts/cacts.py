@@ -61,8 +61,6 @@ class Driver:
         self._generate      = generate
         self._baselines_dir = baseline_dir
         self._cmake_args    = cmake_args
-        work_dir_str = work_dir or os.getcwd()+"/ctest-build"
-        self._work_dir      = Path(work_dir_str).expanduser().absolute()
         self._verbose       = verbose
         self._config_only   = config_only
         self._build_only    = build_only
@@ -74,9 +72,6 @@ class Driver:
         self._machine       = None
         self._builds        = []
         self._config_file   = Path(config_file or self._root_dir / "cacts.yaml")
-
-        # Ensure work dir exists
-        self._work_dir.mkdir(parents=True,exist_ok=True)
 
         ###################################
         #  Parse the project config file  #
@@ -93,6 +88,14 @@ class Driver:
         self._machine = parse_machine(self._config_file,self._project,machine_name)
         self._builds  = parse_builds(self._config_file,self._project,
                                      self._machine,self._generate,build_types)
+
+        ###################################
+        #     Ensure work dir exists      #
+        ###################################
+
+        work_dir_str = work_dir if work_dir else self._machine.work_dir
+        self._work_dir = Path(work_dir_str).expanduser().absolute()
+        self._work_dir.mkdir(parents=True,exist_ok=True)
 
         ###################################
         #          Sanity Checks          #
