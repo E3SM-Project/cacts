@@ -8,7 +8,7 @@ from .utils import expect
 
 ###############################################################################
 @dataclass
-class Project:
+class Project: # pylint: disable=too-many-instance-attributes
 ###############################################################################
     """
     An object storing config data for a cmake
@@ -18,6 +18,7 @@ class Project:
     baselines_gen_label: Optional[str] = None
     baselines_cmp_label: Optional[str] = None
     baselines_summary_file: Optional[str] = None
+    ctest_error_exceptions: list = field(default_factory=list)
     cdash: Dict[str, any] = field(default_factory=dict)
 
     # To check inside init
@@ -26,6 +27,7 @@ class Project:
             'baseline_gen_label',
             'baseline_cmp_label',
             'baseline_summary_file',
+            'ctest_error_exceptions',
             'cmake_settings',
             'cdash'
     }
@@ -58,6 +60,9 @@ class Project:
         # CACTS to ensure that ALL baselines tests complete sucessfully before copying
         # any file to the baselines directory
         self.baselines_summary_file = project_specs.get('baseline_summary_file',None)
+
+        # Allow projects to specify strings that ctest should ignore when scanning logs for errors
+        self.ctest_error_exceptions = project_specs.get('ctest_error_exceptions', [])
 
         # Allow to use a project cmake var that can turn on/off baseline-related code/tests.
         # Can help to limit build time
