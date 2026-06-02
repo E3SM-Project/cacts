@@ -514,6 +514,20 @@ class Driver:
         text += '# Start ctest session\n'
         text += 'ctest_start(Experimental)\n\n'
 
+        if self._project.ctest_error_exceptions:
+            text += '# Generate and load custom error exceptions dynamically\n'
+            text += 'file(WRITE "${CTEST_BINARY_DIRECTORY}/CTestCustom.cmake" "\n'
+            text += '  list(APPEND CTEST_CUSTOM_ERROR_EXCEPTION\n'
+
+            for exc in self._project.ctest_error_exceptions:
+                # We need to escape inner quotes and backslashes so they format perfectly in CMake
+                safe_exc = exc.replace('\\', '\\\\').replace('"', '\\"')
+                text += f'    \\"{safe_exc}\\"\n'
+
+            text += '  )\n'
+            text += '")\n'
+            text += 'ctest_read_custom_files("${CTEST_BINARY_DIRECTORY}")\n\n'
+
         text += '# Configure phase\n'
         text += 'separate_arguments(OPTIONS_LIST UNIX_COMMAND "${CMAKE_COMMAND}")\n'
         text += 'ctest_configure(OPTIONS "${OPTIONS_LIST}" RETURN_VALUE CONFIG_ERROR_CODE)\n'
