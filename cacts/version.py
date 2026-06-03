@@ -4,4 +4,4 @@ NOTE: we put it here, rather than in __init__.py, so we can
 avoid pylint cyclic imports errors
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

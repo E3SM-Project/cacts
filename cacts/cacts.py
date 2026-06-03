@@ -462,7 +462,7 @@ class Driver:
         """
 
         ctest_cmd = "ctest"
-        ctest_cmd += " -VV" if self._verbose else " --output-on-failure"
+        ctest_cmd += " -VV" if self._verbose else " -V --output-on-failure"
         ctest_cmd += f" -S {self._work_dir / build.longname / 'ctest_script.cmake'}"
 
         ctest_cmd += f' -DCMAKE_COMMAND="{cmake_config}"'
@@ -675,7 +675,7 @@ OR
         help="Launch the different build types stacks in parallel")
 
     parser.add_argument("-v", "--verbose", action="store_true",
-        help="Print output of config/build/test phases as they would be printed by a manual run.")
+        help="Print tests output as they run (even if they pass).")
 
     parser.add_argument("--version", action="version", version=f"%(prog)s {version}",
         help="Show the version number and exit")
