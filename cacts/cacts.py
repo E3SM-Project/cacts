@@ -120,8 +120,7 @@ class Driver:
 
             # Check all cdash settings are valid in the project
             cdash = self._project.cdash
-            expect (cdash.get('ctest_config_file',None) or
-                    (cdash.get('drop_site',None) and cdash.get('drop_location',None)),
+            expect (cdash.get('drop_site',None) and cdash.get('drop_location',None),
                     "Cannot submit to cdash, since project.cdash.url is not set.\n"
                     "Please fix your yaml config file.\n")
 
