@@ -49,7 +49,7 @@ class Driver:
     ###########################################################################
     # pylint: disable=too-many-positional-arguments, too-many-arguments, too-many-locals, too-many-statements
     def __init__(self, config_file=None,
-                 machine_name=None, local=False, build_types=None,
+                 machine_name=None, build_types=None,
                  work_dir=None, root_dir=None, baseline_dir=None,
                  cmake_args=None, test_regex=None, test_labels=None,
                  config_only=False, build_only=False, skip_config=False, skip_build=False,
@@ -84,12 +84,8 @@ class Driver:
 
         expect (self._config_file.exists(),
                 f"Could not find/open config file: {self._config_file}\n")
-        expect (not (local and machine_name),
-                "Makes no sense to use -m/--machine and -l/--local at the same time")
 
         self._project = parse_project(self._config_file,self._root_dir)
-        if local:
-            machine_name = 'local'
         self._machine = parse_machine(self._config_file,self._project,machine_name)
         self._builds  = parse_builds(self._config_file,self._project,
                                      self._machine,self._generate,build_types)
@@ -629,10 +625,8 @@ OR
         help="YAML file containing valid project/machine settings")
 
     parser.add_argument("-m", "--machine-name",
-        help="The name of the machine where we're testing. Must be found in machine_specs.py")
-    parser.add_argument("-l", "--local", action="store_true",
-        help="Allow to look for machine configuration in ~/.cime/catcs.yaml. "
-             "The file should contain the machines section, with a machine called 'local'.")
+        help="The name of the machine where we're testing. Must be defined in "
+             "the 'machines' section of the config file (or in ~/.config/cacts.yaml).")
     parser.add_argument("-t", "--build-types", action="extend", nargs='+', default=[],
         help="Only run specific test configurations")
 
