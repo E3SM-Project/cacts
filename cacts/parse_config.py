@@ -47,12 +47,12 @@ def parse_machine(config_file,project,machine_name):
 
     # Special handling of 'local' machine
     machs = content['machines']
-    if machine_name=="local":
-        local_yaml = pathlib.Path("~/.cime/cacts.yaml").expanduser()
+
+    local_yaml = pathlib.Path("~/.config/cacts.yaml").expanduser()
+    if local_yaml.is_file():
         with open(local_yaml,'r',encoding='utf-8') as fd:
             local_content = yaml.load(fd,Loader=yaml.SafeLoader)
         machs.update(local_content['machines'])
-        machine_name = 'local'
 
     # Build Machine
     return Machine(machine_name,project,machs)
